@@ -26,6 +26,8 @@ npm run dev
 
 Open http://localhost:3000.
 
+`npm start` and `npm run dev` now build frontend assets first, so CSS/JS are available even when you only run install + start.
+
 ### Building sources during development
 ```sh
 gulp watch
@@ -71,7 +73,7 @@ Recommended setup:
 1. Push this project to your GitHub repository.
 2. In Render, create a new Web Service from that repository.
 3. Use these settings:
-- Build Command: `npm install && npm run build`
+- Build Command: `npm install`
 - Start Command: `npm start`
 4. Deploy.
 5. Share the Render URL with your colleagues.

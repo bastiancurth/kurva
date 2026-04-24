@@ -10,8 +10,8 @@
   "license": "GPL3",
   "scripts": {
     "build": "gulp build",
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "npm run build && node server.js",
+    "dev": "npm run build && node server.js"
   },
   "devDependencies": {
     "gulp": "^4.0.2",
