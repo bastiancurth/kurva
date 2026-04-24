@@ -305,6 +305,14 @@ Kurve.Game = {
         this.Audio.terminateRound();
         Kurve.Field.resize();
         this.checkForWinner();
+
+        if (this.onlineControls && this.onlineControls.enabled && !this.isGameOver && !this.deathMatch) {
+            setTimeout(function() {
+                if (Kurve.Online.isHost()) {
+                    Kurve.Online.requestNextRound();
+                }
+            }, 1000);
+        }
     },
 
     incrementSuperpowers: function() {

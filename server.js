@@ -12,13 +12,36 @@ var io = new Server(server);
 var PORT = process.env.PORT || 3000;
 var MAX_PLAYERS = 5;
 var RECONNECT_GRACE_MS = 120000;
-var EMPTY_ROOM_TTL_MS = 300000;
 var CLEANUP_INTERVAL_MS = 30000;
 var PLAYER_IDS = ['red', 'orange', 'green', 'blue', 'purple'];
+var PUBLIC_ROOMS = [
+    { code: 'werewolfs-den', name: "Werewolf's Den 🐺" },
+    { code: 'javiers-pc', name: "Javier's PC" },
+    { code: 'kaufland-corner', name: 'Kaufland Corner' },
+    { code: 'break-room', name: 'Break Room' },
+    { code: 'dev-hub', name: 'Dev Hub' },
+    { code: 'qa-bench', name: 'QA Bench' },
+    { code: 'lunch-table', name: 'Lunch Table' },
+    { code: 'projector-lane', name: 'Projector Lane' },
+    { code: 'server-room', name: 'Server Room' },
+    { code: 'quiet-desk', name: 'Quiet Desk' },
+];
 
 var rooms = {};
 var socketToRoom = {};
 var socketToSession = {};
+
+PUBLIC_ROOMS.forEach(function(roomDefinition) {
+    rooms[roomDefinition.code] = {
+        code: roomDefinition.code,
+        name: roomDefinition.name,
+        hostSessionId: null,
+        players: [],
+        assignments: {},
+        matchActive: false,
+        lastActivityAt: Date.now(),
+    };
+});
 
 function sanitizeLabel(value, fallback, maxLength) {
     var normalized = typeof value === 'string' ? value.trim() : '';
@@ -45,6 +68,22 @@ function getConnectedPlayers(room) {
     return room.players.filter(function(player) {
         return player.connected === true;
     });
+}
+
+function normalizePlayerName(name) {
+    return sanitizeLabel(name, 'Player', 16).toLowerCase();
+}
+
+function isNameTaken(room, playerName, sessionId) {
+    var normalizedName = normalizePlayerName(playerName);
+
+    for (var i = 0; i < room.players.length; i++) {
+        var player = room.players[i];
+        if (player.sessionId === sessionId) continue;
+        if (normalizePlayerName(player.name) === normalizedName) return true;
+    }
+
+    return false;
 }
 
 function resolveHostSocketId(room) {
@@ -130,8 +169,8 @@ function getRoomState(room) {
 }
 
 function getRoomList() {
-    return Object.keys(rooms).map(function(roomCode) {
-        var room = rooms[roomCode];
+    return PUBLIC_ROOMS.map(function(roomDefinition) {
+        var room = rooms[roomDefinition.code];
         var connectedPlayers = getConnectedPlayers(room).length;
 
         return {
@@ -141,8 +180,6 @@ function getRoomList() {
             maxPlayers: MAX_PLAYERS,
             matchActive: room.matchActive === true,
         };
-    }).sort(function(roomA, roomB) {
-        return roomA.roomCode.localeCompare(roomB.roomCode);
     });
 }
 
@@ -214,7 +251,12 @@ function leaveRoom(socket, keepSeat) {
     touchRoom(room);
 
     if (room.players.length === 0) {
-        delete rooms[roomCode];
+        room.assignments = {};
+        room.matchActive = false;
+        room.hostSessionId = null;
+        touchRoom(room);
+        emitRoomState(roomCode);
+        emitRoomList();
         return;
     }
 
@@ -225,6 +267,7 @@ function leaveRoom(socket, keepSeat) {
 function addPlayerToRoom(socket, roomCode, name, sessionId) {
     var room = rooms[roomCode];
     var validSessionId = sanitizeSessionId(sessionId);
+    var sanitizedName = sanitizeLabel(name, 'Player', 16);
 
     if (!validSessionId) {
         socket.emit('kurve:error', { message: 'Invalid session. Refresh and try again.' });
@@ -255,13 +298,18 @@ function addPlayerToRoom(socket, roomCode, name, sessionId) {
         return;
     }
 
+    if (!reconnectingPlayer && isNameTaken(room, sanitizedName, validSessionId)) {
+        socket.emit('kurve:error', { message: 'That name is already in this room.' });
+        return;
+    }
+
     leaveRoom(socket, false);
 
     if (reconnectingPlayer) {
         reconnectingPlayer.socketId = socket.id;
         reconnectingPlayer.connected = true;
         reconnectingPlayer.disconnectedAt = null;
-        reconnectingPlayer.name = sanitizeLabel(name, reconnectingPlayer.name, 16);
+        reconnectingPlayer.name = sanitizedName;
     } else {
         var usedPlayerIds = room.players.map(function(player) {
             return player.playerId;
@@ -284,7 +332,7 @@ function addPlayerToRoom(socket, roomCode, name, sessionId) {
             socketId: socket.id,
             sessionId: validSessionId,
             playerId: playerId,
-            name: sanitizeLabel(name, 'Player', 16),
+            name: sanitizedName,
             connected: true,
             disconnectedAt: null,
         });
@@ -336,18 +384,16 @@ function cleanupRooms() {
             room.matchActive = false;
         }
 
-        var connectedPlayers = getConnectedPlayers(room);
-        var idleTooLong = connectedPlayers.length === 0 && (now - room.lastActivityAt) > EMPTY_ROOM_TTL_MS;
-
-        if (room.players.length === 0 || idleTooLong) {
-            delete rooms[roomCode];
-            emitRoomList();
-            continue;
-        }
-
         if (disconnectedSessions.length > 0) {
             emitRoomState(roomCode);
             emitRoomList();
+        }
+
+        if (room.players.length === 0) {
+            room.assignments = {};
+            room.matchActive = false;
+            room.hostSessionId = null;
+            emitRoomState(roomCode);
         }
     }
 }
@@ -366,33 +412,7 @@ io.on('connection', function(socket) {
     });
 
     socket.on('kurve:create-room', function(payload) {
-        var roomCode;
-
-        try {
-            roomCode = createUniqueRoomCode();
-        } catch (error) {
-            socket.emit('kurve:error', { message: 'Could not create room. Try again.' });
-            return;
-        }
-
-        rooms[roomCode] = {
-            code: roomCode,
-            name: sanitizeLabel(payload && payload.roomName, 'Team Room', 32),
-            hostSessionId: sanitizeSessionId(payload && payload.sessionId),
-            players: [],
-            assignments: {},
-            matchActive: false,
-            lastActivityAt: Date.now(),
-        };
-
-        if (!rooms[roomCode].hostSessionId) {
-            delete rooms[roomCode];
-            socket.emit('kurve:error', { message: 'Invalid session. Refresh and try again.' });
-            return;
-        }
-
-        addPlayerToRoom(socket, roomCode, payload && payload.name, payload && payload.sessionId);
-        emitRoomList();
+        socket.emit('kurve:error', { message: 'Use the suggested rooms list.' });
     });
 
     socket.on('kurve:join-room', function(payload) {
@@ -401,7 +421,7 @@ io.on('connection', function(socket) {
             return;
         }
 
-        var roomCode = String(payload.roomCode).toUpperCase();
+        var roomCode = String(payload.roomCode).trim();
         addPlayerToRoom(socket, roomCode, payload.name, payload.sessionId);
         emitRoomList();
     });

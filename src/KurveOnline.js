@@ -45,11 +45,8 @@ Kurve.Online = {
 
     elements: {
         status: null,
-        roomCodeInput: null,
-        roomNameInput: null,
         playerNameInput: null,
         roomList: null,
-        createRoomButton: null,
         joinRoomButton: null,
         leaveRoomButton: null,
         startMatchButton: null,
@@ -77,50 +74,29 @@ Kurve.Online = {
         container.innerHTML =
             '<h4>Online Multiplayer by Bastian Curth</h4>' +
             '<div class="online-row online-note">' +
-                '<span>Up to 5 players. Slots are assigned automatically. Use your arrow keys.</span>' +
+                '<span>Up to 5 players per room. Enter a name, then join a room.</span>' +
             '</div>' +
             '<div class="online-row">' +
                 '<input id="online-player-name" type="text" maxlength="16" placeholder="Your name" value="Player" />' +
             '</div>' +
             '<div class="online-row">' +
-                '<input id="online-room-name" type="text" maxlength="32" placeholder="Room name (emoji welcome)" list="online-room-name-presets" />' +
-            '</div>' +
-            '<datalist id="online-room-name-presets">' +
-                '<option value="Wolf Den 🐺"></option>' +
-                '<option value="Office Laptop"></option>' +
-                '<option value="Checkout Lane 3"></option>' +
-                '<option value="Late Night Takeout"></option>' +
-                '<option value="Sprint Retro Arena"></option>' +
-            '</datalist>' +
-            '<div class="online-row">' +
-                '<input id="online-room-code" type="text" maxlength="6" placeholder="Room code" />' +
-                '<button id="online-join" class="button">Join</button>' +
-            '</div>' +
-            '<div class="online-row">' +
-                '<button id="online-create" class="button">Create room</button>' +
                 '<button id="online-start" class="button" disabled>Start match</button>' +
                 '<button id="online-leave" class="button" disabled>Leave</button>' +
             '</div>' +
             '<div class="online-room-list-wrap">' +
-                '<h5>Open rooms</h5>' +
-                '<div id="online-room-list" class="online-room-list">Connecting ...</div>' +
+                '<h5>Suggested rooms</h5>' +
+                '<div id="online-room-list" class="online-room-list">Loading rooms ...</div>' +
             '</div>' +
             '<div id="online-status" class="online-status">Offline</div>';
 
         document.getElementById('menu-settings').insertAdjacentElement('afterend', container);
 
         this.elements.status = document.getElementById('online-status');
-        this.elements.roomCodeInput = document.getElementById('online-room-code');
-        this.elements.roomNameInput = document.getElementById('online-room-name');
         this.elements.playerNameInput = document.getElementById('online-player-name');
-        this.elements.createRoomButton = document.getElementById('online-create');
-        this.elements.joinRoomButton = document.getElementById('online-join');
+        this.elements.joinRoomButton = null;
         this.elements.leaveRoomButton = document.getElementById('online-leave');
         this.elements.startMatchButton = document.getElementById('online-start');
         this.elements.roomList = document.getElementById('online-room-list');
-
-        this.elements.createRoomButton.addEventListener('click', this.onCreateRoom.bind(this));
-        this.elements.joinRoomButton.addEventListener('click', this.onJoinRoom.bind(this));
         this.elements.leaveRoomButton.addEventListener('click', this.onLeaveRoom.bind(this));
         this.elements.startMatchButton.addEventListener('click', this.onStartMatch.bind(this));
     },
@@ -216,24 +192,14 @@ Kurve.Online = {
     },
 
     onCreateRoom: function() {
-        if (!this.ensureSocketConnection()) return;
-
-        this.localName = this.getPlayerName();
-        this.socket.emit('kurve:create-room', {
-            name: this.localName,
-            roomName: this.getRoomName(),
-            sessionId: this.sessionId,
-        });
-        this.setStatus('Creating room ...');
+        return;
     },
 
-    onJoinRoom: function() {
+    onJoinRoom: function(roomCode) {
         if (!this.ensureSocketConnection()) return;
 
-        var roomCode = this.elements.roomCodeInput.value.trim().toUpperCase();
-
-        if (roomCode.length < 4) {
-            this.setStatus('Enter a valid room code.');
+        if (!roomCode) {
+            this.setStatus('Choose a room from the list.');
             return;
         }
 
@@ -243,12 +209,11 @@ Kurve.Online = {
             name: this.localName,
             sessionId: this.sessionId,
         });
-        this.setStatus('Joining room ' + roomCode + ' ...');
+        this.setStatus('Joining ' + roomCode + ' ...');
     },
 
     onJoinRoomFromList: function(roomCode) {
-        this.elements.roomCodeInput.value = roomCode;
-        this.onJoinRoom();
+        this.onJoinRoom(roomCode);
     },
 
     onLeaveRoom: function() {
@@ -309,17 +274,12 @@ Kurve.Online = {
         this.roomName = payload.roomName || null;
         this.players = payload.players;
         this.hostSocketId = payload.hostSocketId;
-        this.elements.roomCodeInput.value = payload.roomCode;
-
-        if (this.elements.roomNameInput && this.roomName) {
-            this.elements.roomNameInput.value = this.roomName;
-        }
 
         this.updatePlayerAssignment();
         this.syncButtons();
 
         var hostSuffix = this.isHost() ? ' You are host.' : '';
-        var roomLabel = this.roomName ? this.roomName + ' (' + this.roomCode + ')' : this.roomCode;
+        var roomLabel = this.roomName || this.roomCode;
         this.setStatus('Room ' + roomLabel + ': ' + this.getConnectedPlayerCount() + '/' + this.maxPlayers + ' connected.' + hostSuffix);
     },
 
@@ -341,7 +301,7 @@ Kurve.Online = {
             roomHtml += '<div class="online-room-item">' +
                 '<div class="online-room-meta">' +
                     '<strong>' + label + '</strong>' +
-                    '<span>' + room.roomCode + ' · ' + room.connectedPlayers + '/' + room.maxPlayers + (room.matchActive ? ' · in match' : '') + '</span>' +
+                    '<span>' + room.connectedPlayers + '/' + room.maxPlayers + (room.matchActive ? ' · in match' : '') + '</span>' +
                 '</div>' +
                 '<button class="button" data-room-code="' + room.roomCode + '"' + (canJoin ? '' : ' disabled') + '>Join</button>' +
             '</div>';
@@ -489,6 +449,11 @@ Kurve.Online = {
             return;
         }
 
+        if (payload.action === 'next-round') {
+            Kurve.Game.onSpaceDown();
+            return;
+        }
+
         if (payload.action === 'pause') {
             if (Kurve.Game.isRunning && !Kurve.Game.isPaused) Kurve.Game.togglePause();
             return;
@@ -511,9 +476,20 @@ Kurve.Online = {
         this.setStatus((payload && payload.name ? payload.name : 'A player') + ' rejoined the match.');
     },
 
+    requestNextRound: function() {
+        if (!this.isMatchActive || !this.isHost() || this.socket === null || !this.isRoomJoined()) return;
+
+        this.socket.emit('kurve:control', {
+            roomCode: this.roomCode,
+            action: 'next-round',
+        });
+
+        Kurve.Game.onSpaceDown();
+    },
+
     initSessionId: function() {
         try {
-            var existing = localStorage.getItem(this.sessionStorageKey);
+            var existing = sessionStorage.getItem(this.sessionStorageKey);
             if (existing && existing.length >= 12) {
                 this.sessionId = existing;
                 return;
@@ -521,7 +497,7 @@ Kurve.Online = {
 
             var generated = this.generateSessionId();
             this.sessionId = generated;
-            localStorage.setItem(this.sessionStorageKey, generated);
+            sessionStorage.setItem(this.sessionStorageKey, generated);
         } catch (error) {
             this.sessionId = this.generateSessionId();
         }
