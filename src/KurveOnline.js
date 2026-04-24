@@ -417,6 +417,7 @@ Kurve.Online = {
         if (!this.isMatchActive || this.socket === null || !this.isRoomJoined()) return;
 
         var action = this.getActionForOnlineKeyCode(keyCode);
+        var applyFrame = Kurve.Game.CURRENT_FRAME_ID + Kurve.Game.onlineInputDelayFrames;
 
         if (action === null) return;
 
@@ -424,6 +425,7 @@ Kurve.Online = {
             roomCode: this.roomCode,
             action: action,
             isDown: isDown,
+            applyFrame: applyFrame,
         });
     },
 
@@ -434,7 +436,7 @@ Kurve.Online = {
     onRemoteInput: function(payload) {
         if (!this.isMatchActive) return;
 
-        Kurve.Game.applyNetworkInput(payload.playerId, payload.action, payload.isDown);
+        Kurve.Game.queueNetworkInput(payload.playerId, payload.action, payload.isDown, payload.applyFrame);
     },
 
     onRemoteControl: function(payload) {

@@ -44,6 +44,8 @@ Kurve.Game = {
     CURRENT_FRAME_ID:       0,
     onlineControls:         null,
     onlinePendingKeys:      {},
+    onlineInputQueue:       {},
+    onlineInputDelayFrames: 8,
     deterministicRandomState: null,
     onlineRoundStartByPlayer: null,
     pendingOnlineRoundAdvance: false,
@@ -62,6 +64,7 @@ Kurve.Game = {
     
     drawFrame: function() {
         this.CURRENT_FRAME_ID++;
+        this.processOnlineInputQueue(this.CURRENT_FRAME_ID);
 
         for (var i in this.runningCurves) {
             for (var j = 0; this.runningCurves[i] && j < this.runningCurves[i].length; ++j) {
@@ -159,9 +162,37 @@ Kurve.Game = {
         }
     },
 
+    queueNetworkInput: function(playerId, action, isDown, applyFrame) {
+        var targetFrame = parseInt(applyFrame, 10);
+        if (isNaN(targetFrame)) targetFrame = this.CURRENT_FRAME_ID + this.onlineInputDelayFrames;
+        if (targetFrame <= this.CURRENT_FRAME_ID) targetFrame = this.CURRENT_FRAME_ID + 1;
+
+        if (!this.onlineInputQueue[targetFrame]) {
+            this.onlineInputQueue[targetFrame] = [];
+        }
+
+        this.onlineInputQueue[targetFrame].push({
+            playerId: playerId,
+            action: action,
+            isDown: isDown === true,
+        });
+    },
+
+    processOnlineInputQueue: function(frameId) {
+        if (!this.onlineInputQueue[frameId]) return;
+
+        var events = this.onlineInputQueue[frameId];
+        delete this.onlineInputQueue[frameId];
+
+        for (var i = 0; i < events.length; i++) {
+            this.applyNetworkInput(events[i].playerId, events[i].action, events[i].isDown);
+        }
+    },
+
     resetSession: function() {
         this.keysDown = {};
         this.onlinePendingKeys = {};
+        this.onlineInputQueue = {};
         this.curves = [];
         this.runningCurves = {};
         this.players = [];

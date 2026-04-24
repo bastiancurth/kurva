@@ -197,7 +197,7 @@ body#app.online-mode #field {
     height: auto;
     max-width: 100%;
     max-height: 100%;
-    aspect-ratio: 16 / 9;
+    aspect-ratio: 1 / 1;
 }
 
 body#app.online-mode #dark-knight {
@@ -248,13 +248,71 @@ body#app.online-mode #dark-knight {
     position: relative;
     z-index: 1;
     border: 1px solid rgba(148, 163, 184, 0.18);
+    overflow: hidden;
+
+    &::before {
+        content: '';
+        position: absolute;
+        inset: -40% -10% auto auto;
+        width: 320px;
+        height: 320px;
+        border-radius: 999px;
+        background: radial-gradient(circle at center, rgba(56, 189, 248, 0.26) 0%, rgba(59, 130, 246, 0.0) 65%);
+        animation: heroPulse 7s ease-in-out infinite;
+        pointer-events: none;
+    }
+
+    &::after {
+        content: '';
+        position: absolute;
+        inset: auto auto -36% -8%;
+        width: 260px;
+        height: 260px;
+        border-radius: 999px;
+        background: radial-gradient(circle at center, rgba(250, 204, 21, 0.24) 0%, rgba(251, 191, 36, 0.0) 70%);
+        animation: heroPulse 6.2s ease-in-out infinite reverse;
+        pointer-events: none;
+    }
 
     #menu-brand-title {
         margin-bottom: 10px;
-        font-size: 34px;
+        font-size: 40px;
         line-height: 1;
         letter-spacing: -0.03em;
         color: #0f172a;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        position: relative;
+        z-index: 2;
+
+        .brand-main {
+            display: inline-block;
+            background: linear-gradient(90deg, #0f172a 0%, #1d4ed8 35%, #0ea5e9 70%, #0f172a 100%);
+            background-size: 240% 100%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            animation: titleShine 7.5s linear infinite;
+        }
+
+        .brand-mascot {
+            display: inline-block;
+            font-size: 34px;
+            filter: drop-shadow(0 8px 16px rgba(15, 23, 42, 0.2));
+            animation: mascotFloat 2.8s ease-in-out infinite;
+            transform-origin: 50% 60%;
+        }
+    }
+
+    .brand-subtitle {
+        margin-bottom: 8px;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: #475569;
+        position: relative;
+        z-index: 2;
     }
 
     .menu-splash {
@@ -263,11 +321,34 @@ body#app.online-mode #dark-knight {
         font-size: 16px;
         font-style: italic;
         color: #64748b;
+        position: relative;
+        z-index: 2;
     }
 }
 
 #menu-intro h4 {
     color: #334155;
+    position: relative;
+    z-index: 2;
+}
+
+@keyframes mascotFloat {
+    0% { transform: translateY(0) rotate(0deg); }
+    25% { transform: translateY(-4px) rotate(-5deg); }
+    50% { transform: translateY(-8px) rotate(2deg); }
+    75% { transform: translateY(-4px) rotate(5deg); }
+    100% { transform: translateY(0) rotate(0deg); }
+}
+
+@keyframes titleShine {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 220% 50%; }
+}
+
+@keyframes heroPulse {
+    0% { transform: scale(0.95); opacity: 0.75; }
+    50% { transform: scale(1.08); opacity: 1; }
+    100% { transform: scale(0.95); opacity: 0.75; }
 }
 
 #menu-players {

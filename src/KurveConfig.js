@@ -55,8 +55,8 @@ Kurve.Config = {
     },
 
     Online: {
-        fixedFieldWidth: 1280,
-        fixedFieldHeight: 720,
+        fixedFieldWidth: 1000,
+        fixedFieldHeight: 1000,
     },
 
     Superpower: {

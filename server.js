@@ -572,6 +572,7 @@ io.on('connection', function(socket) {
             playerId: playerId,
             action: payload.action,
             isDown: payload.isDown === true,
+            applyFrame: parseInt(payload.applyFrame, 10),
         });
     });
 
