@@ -80,11 +80,6 @@ Kurve.Game = {
 
         if ( event.keyCode === 32 ) {
             if (this.onlineControls && this.onlineControls.enabled) {
-                if (this.onlineControls.localPlayerId !== null) {
-                    this.onSpaceDown();
-                    Kurve.Online.onLocalSpaceKey();
-                }
-
                 return;
             }
 
@@ -132,12 +127,7 @@ Kurve.Game = {
     isLocalInputKey: function(keyCode) {
         if (!this.onlineControls || !this.onlineControls.enabled) return true;
 
-        var player = this.getPlayerById(this.onlineControls.localPlayerId);
-        if (!player) return false;
-
-        return player.getKeyLeft() === keyCode ||
-               player.getKeyRight() === keyCode ||
-               player.getKeySuperpower() === keyCode;
+        return keyCode === 37 || keyCode === 39 || keyCode === 40;
     },
 
     applyNetworkInput: function(playerId, action, isDown) {

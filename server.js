@@ -129,6 +129,34 @@ function getRoomState(room) {
     };
 }
 
+function getRoomList() {
+    return Object.keys(rooms).map(function(roomCode) {
+        var room = rooms[roomCode];
+        var connectedPlayers = getConnectedPlayers(room).length;
+
+        return {
+            roomCode: room.code,
+            roomName: room.name,
+            connectedPlayers: connectedPlayers,
+            maxPlayers: MAX_PLAYERS,
+            matchActive: room.matchActive === true,
+        };
+    }).sort(function(roomA, roomB) {
+        return roomA.roomCode.localeCompare(roomB.roomCode);
+    });
+}
+
+function emitRoomList(targetSocket) {
+    var payload = { rooms: getRoomList() };
+
+    if (targetSocket) {
+        targetSocket.emit('kurve:rooms-list', payload);
+        return;
+    }
+
+    io.emit('kurve:rooms-list', payload);
+}
+
 function emitRoomState(roomCode) {
     var room = rooms[roomCode];
     if (!room) return;
@@ -191,6 +219,7 @@ function leaveRoom(socket, keepSeat) {
     }
 
     emitRoomState(roomCode);
+    emitRoomList();
 }
 
 function addPlayerToRoom(socket, roomCode, name, sessionId) {
@@ -312,11 +341,13 @@ function cleanupRooms() {
 
         if (room.players.length === 0 || idleTooLong) {
             delete rooms[roomCode];
+            emitRoomList();
             continue;
         }
 
         if (disconnectedSessions.length > 0) {
             emitRoomState(roomCode);
+            emitRoomList();
         }
     }
 }
@@ -328,6 +359,12 @@ app.get('/healthz', function(req, res) {
 });
 
 io.on('connection', function(socket) {
+    emitRoomList(socket);
+
+    socket.on('kurve:rooms-list-request', function() {
+        emitRoomList(socket);
+    });
+
     socket.on('kurve:create-room', function(payload) {
         var roomCode;
 
@@ -355,6 +392,7 @@ io.on('connection', function(socket) {
         }
 
         addPlayerToRoom(socket, roomCode, payload && payload.name, payload && payload.sessionId);
+        emitRoomList();
     });
 
     socket.on('kurve:join-room', function(payload) {
@@ -365,10 +403,12 @@ io.on('connection', function(socket) {
 
         var roomCode = String(payload.roomCode).toUpperCase();
         addPlayerToRoom(socket, roomCode, payload.name, payload.sessionId);
+        emitRoomList();
     });
 
     socket.on('kurve:leave-room', function() {
         leaveRoom(socket, false);
+        emitRoomList();
     });
 
     socket.on('kurve:start-match', function(payload) {
@@ -402,6 +442,7 @@ io.on('connection', function(socket) {
                 };
             }),
         });
+        emitRoomList();
     });
 
     socket.on('kurve:input', function(payload) {
@@ -442,6 +483,7 @@ io.on('connection', function(socket) {
 
     socket.on('disconnect', function() {
         leaveRoom(socket, true);
+        emitRoomList();
     });
 });
 

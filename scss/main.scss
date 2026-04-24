@@ -355,6 +355,64 @@ p {
         font-size: 15px;
         color: #666666;
     }
+
+    .online-room-list-wrap {
+        margin-top: 10px;
+
+        h5 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #888;
+        }
+    }
+
+    .online-room-list {
+        max-height: 220px;
+        overflow-y: auto;
+        border: 1px solid #d9d6cc;
+        background: #fff;
+        padding: 6px;
+    }
+
+    .online-room-item {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        align-items: center;
+        padding: 8px 6px;
+        border-bottom: 1px solid #ece8df;
+
+        &:last-child {
+            border-bottom: 0;
+        }
+
+        .online-room-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+
+            strong {
+                font-size: 15px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            span {
+                font-size: 12px;
+                color: #777;
+            }
+        }
+    }
+
+    .online-room-empty {
+        padding: 8px 6px;
+        color: #777;
+        font-size: 13px;
+    }
 }
 
 #lightbox-overlay {

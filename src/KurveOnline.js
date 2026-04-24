@@ -38,6 +38,7 @@ Kurve.Online = {
     activePlayerIds: [],
     localName: 'Player',
     isMatchActive: false,
+    socketIoClientLoading: false,
 
     sessionStorageKey: 'kurve-online-session-id',
     allowedPlayerIds: ['red', 'orange', 'green', 'blue', 'purple'],
@@ -47,6 +48,7 @@ Kurve.Online = {
         roomCodeInput: null,
         roomNameInput: null,
         playerNameInput: null,
+        roomList: null,
         createRoomButton: null,
         joinRoomButton: null,
         leaveRoomButton: null,
@@ -56,10 +58,8 @@ Kurve.Online = {
     init: function() {
         this.initSessionId();
         this.initUi();
-
-        if (!this.isSocketIoAvailable()) {
-            this.setStatus('Online mode unavailable. Start via Render/Node server.');
-        }
+        this.ensureSocketConnection();
+        this.setStatus('Online rooms will appear when the connection is ready.');
     },
 
     isSocketIoAvailable: function() {
@@ -67,13 +67,17 @@ Kurve.Online = {
     },
 
     initUi: function() {
+        if (document.getElementById('menu-players')) {
+            u.addClass('hidden', 'menu-players');
+        }
+
         var container = document.createElement('div');
         container.id = 'online-panel';
         container.className = 'light';
         container.innerHTML =
             '<h4>Online Multiplayer by Bastian Curth</h4>' +
             '<div class="online-row online-note">' +
-                '<span>Up to 5 players. Reconnect supported.</span>' +
+                '<span>Up to 5 players. Slots are assigned automatically. Use your arrow keys.</span>' +
             '</div>' +
             '<div class="online-row">' +
                 '<input id="online-player-name" type="text" maxlength="16" placeholder="Your name" value="Player" />' +
@@ -97,6 +101,10 @@ Kurve.Online = {
                 '<button id="online-start" class="button" disabled>Start match</button>' +
                 '<button id="online-leave" class="button" disabled>Leave</button>' +
             '</div>' +
+            '<div class="online-room-list-wrap">' +
+                '<h5>Open rooms</h5>' +
+                '<div id="online-room-list" class="online-room-list">Connecting ...</div>' +
+            '</div>' +
             '<div id="online-status" class="online-status">Offline</div>';
 
         document.getElementById('menu-settings').insertAdjacentElement('afterend', container);
@@ -109,6 +117,7 @@ Kurve.Online = {
         this.elements.joinRoomButton = document.getElementById('online-join');
         this.elements.leaveRoomButton = document.getElementById('online-leave');
         this.elements.startMatchButton = document.getElementById('online-start');
+        this.elements.roomList = document.getElementById('online-room-list');
 
         this.elements.createRoomButton.addEventListener('click', this.onCreateRoom.bind(this));
         this.elements.joinRoomButton.addEventListener('click', this.onJoinRoom.bind(this));
@@ -118,7 +127,7 @@ Kurve.Online = {
 
     ensureSocketConnection: function() {
         if (!this.isSocketIoAvailable()) {
-            this.setStatus('Socket.io client not found.');
+            this.loadSocketIoClient();
             return false;
         }
 
@@ -176,7 +185,34 @@ Kurve.Online = {
             this.onPlayerRejoin(payload);
         }.bind(this));
 
+        this.socket.on('kurve:rooms-list', function(payload) {
+            this.renderRoomList(payload.rooms || []);
+        }.bind(this));
+
+        this.socket.emit('kurve:rooms-list-request');
+
         return true;
+    },
+
+    loadSocketIoClient: function() {
+        if (this.socketIoClientLoading || this.isSocketIoAvailable()) return;
+
+        this.socketIoClientLoading = true;
+
+        var script = document.createElement('script');
+        script.type = 'text/javascript';
+        script.src = '/socket.io/socket.io.js';
+        script.onload = function() {
+            this.socketIoClientLoading = false;
+            this.setStatus('Multiplayer client loaded.');
+            this.ensureSocketConnection();
+        }.bind(this);
+        script.onerror = function() {
+            this.socketIoClientLoading = false;
+            this.setStatus('Multiplayer client could not be loaded.');
+        }.bind(this);
+
+        document.head.appendChild(script);
     },
 
     onCreateRoom: function() {
@@ -208,6 +244,11 @@ Kurve.Online = {
             sessionId: this.sessionId,
         });
         this.setStatus('Joining room ' + roomCode + ' ...');
+    },
+
+    onJoinRoomFromList: function(roomCode) {
+        this.elements.roomCodeInput.value = roomCode;
+        this.onJoinRoom();
     },
 
     onLeaveRoom: function() {
@@ -280,6 +321,41 @@ Kurve.Online = {
         var hostSuffix = this.isHost() ? ' You are host.' : '';
         var roomLabel = this.roomName ? this.roomName + ' (' + this.roomCode + ')' : this.roomCode;
         this.setStatus('Room ' + roomLabel + ': ' + this.getConnectedPlayerCount() + '/' + this.maxPlayers + ' connected.' + hostSuffix);
+    },
+
+    renderRoomList: function(rooms) {
+        if (!this.elements.roomList) return;
+
+        if (!rooms || rooms.length === 0) {
+            this.elements.roomList.innerHTML = '<div class="online-room-empty">No open rooms yet.</div>';
+            return;
+        }
+
+        var roomHtml = '';
+
+        for (var i = 0; i < rooms.length; i++) {
+            var room = rooms[i];
+            var label = room.roomName ? room.roomName : 'Room';
+            var canJoin = room.connectedPlayers < room.maxPlayers && !room.matchActive;
+
+            roomHtml += '<div class="online-room-item">' +
+                '<div class="online-room-meta">' +
+                    '<strong>' + label + '</strong>' +
+                    '<span>' + room.roomCode + ' · ' + room.connectedPlayers + '/' + room.maxPlayers + (room.matchActive ? ' · in match' : '') + '</span>' +
+                '</div>' +
+                '<button class="button" data-room-code="' + room.roomCode + '"' + (canJoin ? '' : ' disabled') + '>Join</button>' +
+            '</div>';
+        }
+
+        this.elements.roomList.innerHTML = roomHtml;
+
+        var buttons = this.elements.roomList.querySelectorAll('button[data-room-code]');
+        for (var j = 0; j < buttons.length; j++) {
+            buttons[j].addEventListener('click', function(event) {
+                var code = event.currentTarget.getAttribute('data-room-code');
+                this.onJoinRoomFromList(code);
+            }.bind(this));
+        }
     },
 
     getRoomName: function() {
@@ -385,7 +461,7 @@ Kurve.Online = {
     onLocalGameplayKey: function(keyCode, isDown) {
         if (!this.isMatchActive || this.socket === null || !this.isRoomJoined()) return;
 
-        var action = this.getActionForKeyCode(this.localPlayerId, keyCode);
+        var action = this.getActionForOnlineKeyCode(keyCode);
 
         if (action === null) return;
 
@@ -397,13 +473,7 @@ Kurve.Online = {
     },
 
     onLocalSpaceKey: function() {
-        if (!this.isMatchActive || this.socket === null || !this.isRoomJoined()) return;
-        if (this.localPlayerId === null) return;
-
-        this.socket.emit('kurve:control', {
-            roomCode: this.roomCode,
-            action: 'space',
-        });
+        return;
     },
 
     onRemoteInput: function(payload) {
@@ -468,6 +538,14 @@ Kurve.Online = {
         if (player.getKeyLeft() === keyCode) return 'left';
         if (player.getKeyRight() === keyCode) return 'right';
         if (player.getKeySuperpower() === keyCode) return 'superpower';
+
+        return null;
+    },
+
+    getActionForOnlineKeyCode: function(keyCode) {
+        if (keyCode === 37) return 'left';
+        if (keyCode === 39) return 'right';
+        if (keyCode === 40) return 'superpower';
 
         return null;
     },
