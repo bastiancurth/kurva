@@ -36,6 +36,7 @@ Kurve.Online = {
     sessionId: null,
     localPlayerId: null,
     activePlayerIds: [],
+    assignedSuperpowers: {},
     localName: 'Player',
     isMatchActive: false,
     socketIoClientLoading: false,
@@ -333,6 +334,7 @@ Kurve.Online = {
     onMatchStart: function(payload) {
         this.isMatchActive = true;
         this.activePlayerIds = [];
+        this.assignedSuperpowers = payload.superpowers || {};
 
         this.localPlayerId = payload.assignments[this.sessionId] || null;
 
@@ -345,12 +347,13 @@ Kurve.Online = {
             return;
         }
 
-        this.startOnlineGame(payload.seed);
+        this.startOnlineGame(payload.seed, payload.roundStart || null);
     },
 
-    startOnlineGame: function(seed) {
+    startOnlineGame: function(seed, roundStart) {
         Kurve.Game.resetSession();
         Kurve.Game.setDeterministicSeed(seed);
+        Kurve.Game.setOnlineRoundStart(roundStart);
         this.prepareOnlinePlayers();
         Kurve.Game.setOnlineControls(this.localPlayerId);
 
@@ -385,13 +388,13 @@ Kurve.Online = {
         });
 
         this.activePlayerIds.forEach(function(playerId) {
-            var randomType = availableTypes[Math.floor(Kurve.Game.random() * availableTypes.length)];
+            var randomType = this.assignedSuperpowers[playerId] || availableTypes[Math.floor(Kurve.Game.random() * availableTypes.length)];
             if (randomType) {
                 Kurve.getPlayer(playerId).setSuperpower(Kurve.Factory.getSuperpower(randomType));
             }
 
             Kurve.Menu.activatePlayer(playerId);
-        });
+        }.bind(this));
     },
 
     syncButtons: function() {
@@ -441,7 +444,8 @@ Kurve.Online = {
         }
 
         if (payload.action === 'next-round') {
-            Kurve.Game.onSpaceDown();
+            Kurve.Game.setOnlineRoundStart(payload.roundStart || null);
+            Kurve.Game.advanceOnlineRound();
             return;
         }
 

@@ -14,6 +14,24 @@ var MAX_PLAYERS = 5;
 var RECONNECT_GRACE_MS = 120000;
 var CLEANUP_INTERVAL_MS = 30000;
 var PLAYER_IDS = ['red', 'orange', 'green', 'blue', 'purple'];
+var ONLINE_FIELD_WIDTH = 1280;
+var ONLINE_FIELD_HEIGHT = 720;
+var ONLINE_FIELD_BORDER_PADDING = 80;
+var ONLINE_MIN_SPAWN_DISTANCE = 130;
+var SUPERPOWER_TYPES = [
+    'RUN_FASTER',
+    'RUN_SLOWER',
+    'JUMP',
+    'INVISIBLE',
+    'VERTICAL_BAR',
+    'CROSS_WALLS',
+    'DARK_KNIGHT',
+    'HYDRA',
+    'REVERSE',
+    'SQUARE_HEAD',
+    'CHUCK_NORRIS',
+    'SHOOT_HOLES',
+];
 var PUBLIC_ROOMS = [
     { code: 'werewolfs-den', name: "Werewolf's Den 🐺" },
     { code: 'javiers-pc', name: "Javier's PC" },
@@ -58,6 +76,73 @@ function sanitizeSessionId(sessionId) {
     if (cleaned.length < 8) return null;
 
     return cleaned;
+}
+
+function randomFloat(seedState) {
+    seedState.value = (1664525 * seedState.value + 1013904223) >>> 0;
+    return seedState.value / 4294967296;
+}
+
+function randomInt(seedState, min, max) {
+    return min + Math.floor(randomFloat(seedState) * (max - min + 1));
+}
+
+function randomSpawn(seedState) {
+    return {
+        x: randomInt(seedState, ONLINE_FIELD_BORDER_PADDING, ONLINE_FIELD_WIDTH - ONLINE_FIELD_BORDER_PADDING),
+        y: randomInt(seedState, ONLINE_FIELD_BORDER_PADDING, ONLINE_FIELD_HEIGHT - ONLINE_FIELD_BORDER_PADDING),
+        angle: randomFloat(seedState) * Math.PI * 2,
+    };
+}
+
+function getDistanceSquared(a, b) {
+    var dx = a.x - b.x;
+    var dy = a.y - b.y;
+    return dx * dx + dy * dy;
+}
+
+function buildRoundStart(seed, connectedPlayers) {
+    var seedState = { value: seed >>> 0 };
+    var roundStart = {};
+    var usedPositions = [];
+    var minDistanceSquared = ONLINE_MIN_SPAWN_DISTANCE * ONLINE_MIN_SPAWN_DISTANCE;
+
+    connectedPlayers.forEach(function(player) {
+        var spawn = null;
+
+        for (var i = 0; i < 40; i++) {
+            var candidate = randomSpawn(seedState);
+            var hasConflict = usedPositions.some(function(existingSpawn) {
+                return getDistanceSquared(existingSpawn, candidate) < minDistanceSquared;
+            });
+
+            if (!hasConflict) {
+                spawn = candidate;
+                break;
+            }
+        }
+
+        if (spawn === null) {
+            spawn = randomSpawn(seedState);
+        }
+
+        usedPositions.push(spawn);
+        roundStart[player.playerId] = spawn;
+    });
+
+    return roundStart;
+}
+
+function buildSuperpowerAssignments(seed, connectedPlayers) {
+    var seedState = { value: (seed ^ 0x9e3779b9) >>> 0 };
+    var assignments = {};
+
+    connectedPlayers.forEach(function(player) {
+        var type = SUPERPOWER_TYPES[randomInt(seedState, 0, SUPERPOWER_TYPES.length - 1)];
+        assignments[player.playerId] = type;
+    });
+
+    return assignments;
 }
 
 function touchRoom(room) {
@@ -451,9 +536,15 @@ io.on('connection', function(socket) {
         room.matchActive = true;
         touchRoom(room);
 
+        var seed = Math.floor(Math.random() * 4294967295);
+        var roundStart = buildRoundStart(seed, connectedPlayers);
+        var superpowers = buildSuperpowerAssignments(seed, connectedPlayers);
+
         io.to(roomCode).emit('kurve:match-start', {
-            seed: Math.floor(Math.random() * 4294967295),
+            seed: seed,
             assignments: room.assignments,
+            roundStart: roundStart,
+            superpowers: superpowers,
             players: connectedPlayers.map(function(player) {
                 return {
                     sessionId: player.sessionId,
@@ -497,8 +588,19 @@ io.on('connection', function(socket) {
 
         touchRoom(room);
 
-        io.to(roomCode).emit('kurve:control', {
+        var controlPayload = {
             action: payload.action,
+        };
+
+        if (payload.action === 'next-round') {
+            var connectedPlayers = getConnectedPlayers(room);
+            var roundSeed = Math.floor(Math.random() * 4294967295);
+            controlPayload.roundStart = buildRoundStart(roundSeed, connectedPlayers);
+        }
+
+        io.to(roomCode).emit('kurve:control', {
+            action: controlPayload.action,
+            roundStart: controlPayload.roundStart,
         });
     });
 

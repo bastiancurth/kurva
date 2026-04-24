@@ -45,6 +45,8 @@ Kurve.Game = {
     onlineControls:         null,
     onlinePendingKeys:      {},
     deterministicRandomState: null,
+    onlineRoundStartByPlayer: null,
+    pendingOnlineRoundAdvance: false,
     
     init: function() {
         this.fps = Kurve.Config.Game.fps;
@@ -169,6 +171,8 @@ Kurve.Game = {
         this.isGameOver = false;
         this.CURRENT_FRAME_ID = 0;
         this.deterministicRandomState = null;
+        this.onlineRoundStartByPlayer = null;
+        this.pendingOnlineRoundAdvance = false;
     },
 
     setDeterministicSeed: function(seed) {
@@ -180,6 +184,33 @@ Kurve.Game = {
 
         this.deterministicRandomState = (1664525 * this.deterministicRandomState + 1013904223) >>> 0;
         return this.deterministicRandomState / 4294967296;
+    },
+
+    setOnlineRoundStart: function(roundStartByPlayer) {
+        this.onlineRoundStartByPlayer = roundStartByPlayer || null;
+    },
+
+    advanceOnlineRound: function() {
+        if (!this.onlineControls || !this.onlineControls.enabled) return;
+        if (this.isGameOver) return;
+        if (this.isRunning) {
+            this.pendingOnlineRoundAdvance = true;
+            return;
+        }
+
+        if (this.isPaused) {
+            this.endPause();
+            return;
+        }
+
+        if (!this.isRoundStarted && !this.deathMatch) {
+            this.startNewRound();
+            return;
+        }
+
+        if (!this.isRoundStarted && this.deathMatch) {
+            this.startDeathMatch();
+        }
     },
     
     onSpaceDown: function() {
@@ -302,12 +333,23 @@ Kurve.Game = {
         this.curves.forEach(function(curve) {
             Kurve.Game.runningCurves[curve.getPlayer().getId()] = [curve];
 
-            var randomPosition = Kurve.Field.getRandomPosition();
-            curve.setPosition(randomPosition.getPosX(), randomPosition.getPosY());
-            curve.setRandomAngle();
+            var playerId = curve.getPlayer().getId();
+            var roundStart = this.onlineRoundStartByPlayer ? this.onlineRoundStartByPlayer[playerId] : null;
+
+            if (roundStart) {
+                curve.setPosition(roundStart.x, roundStart.y);
+                curve.setAngle(roundStart.angle);
+            } else {
+                var randomPosition = Kurve.Field.getRandomPosition();
+                curve.setPosition(randomPosition.getPosX(), randomPosition.getPosY());
+                curve.setRandomAngle();
+            }
+
             curve.getPlayer().getSuperpower().init(curve);
             curve.drawCurrentPosition(Kurve.Field);
-        });
+        }.bind(this));
+
+        this.onlineRoundStartByPlayer = null;
     },
     
     terminateRound: function() {
@@ -327,6 +369,12 @@ Kurve.Game = {
         this.Audio.terminateRound();
         Kurve.Field.resize();
         this.checkForWinner();
+
+        if (this.onlineControls && this.onlineControls.enabled && this.pendingOnlineRoundAdvance && !this.isGameOver && !this.deathMatch) {
+            this.pendingOnlineRoundAdvance = false;
+            this.startNewRound();
+            return;
+        }
 
         if (this.onlineControls && this.onlineControls.enabled && !this.isGameOver && !this.deathMatch) {
             setTimeout(function() {
