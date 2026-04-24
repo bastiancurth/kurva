@@ -367,6 +367,7 @@ Kurve.Online = {
         Kurve.Menu.audioPlayer.pause('menu-music', {fade: 1000});
         Kurve.Game.startGame();
 
+        u.addClass('online-mode', 'app');
         u.addClass('hidden', 'layer-menu');
         u.removeClass('hidden', 'layer-game');
 

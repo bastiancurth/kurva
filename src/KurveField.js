@@ -68,14 +68,24 @@ Kurve.Field = {
 
     initPixi: function() {
         PIXI.utils.skipHello();
-        this.pixiApp = new PIXI.Application({
+        var useFixedOnlineField =
+            Kurve.Game &&
+            Kurve.Game.onlineControls &&
+            Kurve.Game.onlineControls.enabled;
+
+        var appConfig = {
             view: this.canvas,
-            resizeTo: this.canvas.parentElement,
             width: this.canvas.width,
             height: this.canvas.height,
             antialias: true,
             backgroundAlpha: 0,
-        });
+        };
+
+        if (!useFixedOnlineField) {
+            appConfig.resizeTo = this.canvas.parentElement;
+        }
+
+        this.pixiApp = new PIXI.Application(appConfig);
         this.pixiCurves = new PIXI.Graphics();
         this.pixiField = new PIXI.Graphics();
         this.pixiDebug = new PIXI.Graphics();
@@ -116,10 +126,8 @@ Kurve.Field = {
 
         this.canvas.width = this.width;
         this.canvas.height = this.height;
-        this.canvas.style.width = this.width + 'px';
-        this.canvas.style.height = this.height + 'px';
 
-        this.pixiApp.resize();
+        this.pixiApp.renderer.resize(this.width, this.height);
         this.drawField();
     },
 
