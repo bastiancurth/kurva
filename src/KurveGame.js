@@ -43,6 +43,8 @@ Kurve.Game = {
     isGameOver:             false,
     CURRENT_FRAME_ID:       0,
     onlineControls:         null,
+    onlinePendingKeys:      {},
+    deterministicRandomState: null,
     
     init: function() {
         this.fps = Kurve.Config.Game.fps;
@@ -90,11 +92,15 @@ Kurve.Game = {
             return;
         }
 
-        this.keysDown[event.keyCode] = true;
-
         if (this.onlineControls && this.onlineControls.enabled) {
+            if (this.onlinePendingKeys[event.keyCode] === true) return;
+
+            this.onlinePendingKeys[event.keyCode] = true;
             Kurve.Online.onLocalGameplayKey(event.keyCode, true);
+            return;
         }
+
+        this.keysDown[event.keyCode] = true;
     },
     
     onKeyUp: function(event) {
@@ -102,11 +108,13 @@ Kurve.Game = {
             return;
         }
 
-        delete this.keysDown[event.keyCode];
-
         if (this.onlineControls && this.onlineControls.enabled) {
+            delete this.onlinePendingKeys[event.keyCode];
             Kurve.Online.onLocalGameplayKey(event.keyCode, false);
+            return;
         }
+
+        delete this.keysDown[event.keyCode];
     },
     
     isKeyDown: function(keyCode) {
@@ -151,6 +159,7 @@ Kurve.Game = {
 
     resetSession: function() {
         this.keysDown = {};
+        this.onlinePendingKeys = {};
         this.curves = [];
         this.runningCurves = {};
         this.players = [];
@@ -159,6 +168,18 @@ Kurve.Game = {
         this.isRoundStarted = false;
         this.isGameOver = false;
         this.CURRENT_FRAME_ID = 0;
+        this.deterministicRandomState = null;
+    },
+
+    setDeterministicSeed: function(seed) {
+        this.deterministicRandomState = seed >>> 0;
+    },
+
+    random: function() {
+        if (this.deterministicRandomState === null) return Math.random();
+
+        this.deterministicRandomState = (1664525 * this.deterministicRandomState + 1013904223) >>> 0;
+        return this.deterministicRandomState / 4294967296;
     },
     
     onSpaceDown: function() {
@@ -280,8 +301,9 @@ Kurve.Game = {
     initRun: function() {
         this.curves.forEach(function(curve) {
             Kurve.Game.runningCurves[curve.getPlayer().getId()] = [curve];
-            
-            curve.setPosition(Kurve.Field.getRandomPosition().getPosX(), Kurve.Field.getRandomPosition().getPosY());
+
+            var randomPosition = Kurve.Field.getRandomPosition();
+            curve.setPosition(randomPosition.getPosX(), randomPosition.getPosY());
             curve.setRandomAngle();
             curve.getPlayer().getSuperpower().init(curve);
             curve.drawCurrentPosition(Kurve.Field);

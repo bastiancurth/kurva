@@ -226,7 +226,7 @@ Kurve.Curve.prototype.computeNewAngle = function() {
 };
     
 Kurve.Curve.prototype.setRandomAngle = function() {
-    this.setAngle(2 * Math.PI * Math.random());
+    this.setAngle(2 * Math.PI * Kurve.Game.random());
 };
 
 Kurve.Curve.prototype.useSuperpower = function(hook) {
@@ -238,7 +238,7 @@ Kurve.Curve.prototype.useSuperpower = function(hook) {
 };
 
 Kurve.Curve.prototype.resetHoleCountDown = function() {
-    this.getOptions().holeCountDown = this.getOptions().holeInterval + u.round(Math.random() * this.getOptions().holeIntervalRandomness, 0);
+    this.getOptions().holeCountDown = this.getOptions().holeInterval + u.round(Kurve.Game.random() * this.getOptions().holeIntervalRandomness, 0);
 };
 
 Kurve.Curve.prototype.setMuted = function (soundKey, muted) {

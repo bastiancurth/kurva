@@ -318,13 +318,6 @@ Kurve.Online = {
         }
     },
 
-    getRoomName: function() {
-        var roomName = this.elements.roomNameInput ? this.elements.roomNameInput.value.trim() : '';
-        if (roomName.length === 0) return '';
-
-        return Array.from(roomName).slice(0, 32).join('');
-    },
-
     updatePlayerAssignment: function() {
         var localPlayer = null;
 
@@ -356,7 +349,7 @@ Kurve.Online = {
     },
 
     startOnlineGame: function(seed) {
-        this.applyDeterministicRandom(seed);
+        Kurve.Game.setDeterministicSeed(seed);
         this.prepareOnlinePlayers();
 
         Kurve.Game.resetSession();
@@ -390,15 +383,6 @@ Kurve.Online = {
         });
     },
 
-    applyDeterministicRandom: function(seed) {
-        var state = seed >>> 0;
-
-        Math.random = function() {
-            state = (1664525 * state + 1013904223) >>> 0;
-            return state / 4294967296;
-        };
-    },
-
     syncButtons: function() {
         var inRoom = this.isRoomJoined();
         var canStart = inRoom && this.isHost() && this.hasMinimumPlayers() && !this.isMatchActive;
@@ -409,11 +393,7 @@ Kurve.Online = {
 
     shouldConsumeMenuKey: function(event) {
         if (!this.isRoomJoined()) return false;
-        if (event.target && (
-            event.target.id === 'online-room-code' ||
-            event.target.id === 'online-player-name' ||
-            event.target.id === 'online-room-name'
-        )) return false;
+        if (event.target && event.target.id === 'online-player-name') return false;
 
         return true;
     },
@@ -437,7 +417,7 @@ Kurve.Online = {
     },
 
     onRemoteInput: function(payload) {
-        if (!this.isMatchActive || payload.playerId === this.localPlayerId) return;
+        if (!this.isMatchActive) return;
 
         Kurve.Game.applyNetworkInput(payload.playerId, payload.action, payload.isDown);
     },
@@ -483,8 +463,6 @@ Kurve.Online = {
             roomCode: this.roomCode,
             action: 'next-round',
         });
-
-        Kurve.Game.onSpaceDown();
     },
 
     initSessionId: function() {
@@ -505,17 +483,6 @@ Kurve.Online = {
 
     generateSessionId: function() {
         return 's' + Date.now().toString(36) + Math.random().toString(36).substring(2, 10);
-    },
-
-    getActionForKeyCode: function(playerId, keyCode) {
-        var player = Kurve.getPlayer(playerId);
-        if (!player) return null;
-
-        if (player.getKeyLeft() === keyCode) return 'left';
-        if (player.getKeyRight() === keyCode) return 'right';
-        if (player.getKeySuperpower() === keyCode) return 'superpower';
-
-        return null;
     },
 
     getActionForOnlineKeyCode: function(keyCode) {

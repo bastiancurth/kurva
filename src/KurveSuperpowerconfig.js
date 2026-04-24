@@ -714,7 +714,7 @@ Kurve.Superpowerconfig[Kurve.Superpowerconfig.types.RANDOM] = {
     helpers: {},
     init: function(curve) {
         var superpowerTypes = Object.values(Kurve.Superpowerconfig.types).filter(type => type !== Kurve.Superpowerconfig.types.RANDOM);
-        var randomSuperpowerType = superpowerTypes[Math.floor(Math.random() * superpowerTypes.length)];
+        var randomSuperpowerType = superpowerTypes[Math.floor(Kurve.Game.random() * superpowerTypes.length)];
         var randomSuperpower = Kurve.Factory.getSuperpower(randomSuperpowerType);
 
         this.label = randomSuperpower.label;

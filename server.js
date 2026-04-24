@@ -477,7 +477,7 @@ io.on('connection', function(socket) {
 
         touchRoom(room);
 
-        socket.to(roomCode).emit('kurve:input', {
+        io.to(roomCode).emit('kurve:input', {
             playerId: playerId,
             action: payload.action,
             isDown: payload.isDown === true,
@@ -493,10 +493,11 @@ io.on('connection', function(socket) {
 
         var sessionId = socketToSession[socket.id];
         if (!sessionId || !room.assignments[sessionId]) return;
+        if (payload.action === 'next-round' && resolveHostSocketId(room) !== socket.id) return;
 
         touchRoom(room);
 
-        socket.to(roomCode).emit('kurve:control', {
+        io.to(roomCode).emit('kurve:control', {
             action: payload.action,
         });
     });

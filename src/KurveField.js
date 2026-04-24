@@ -256,8 +256,8 @@ Kurve.Field = {
     getRandomPosition: function(borderPadding) {
         if ( borderPadding === undefined ) borderPadding = 80;
         
-        var posX = borderPadding + Math.round( (this.width - 2*borderPadding)*Math.random() );
-        var posY = borderPadding + Math.round( (this.height - 2*borderPadding)*Math.random() );
+        var posX = borderPadding + Math.round( (this.width - 2*borderPadding)*Kurve.Game.random() );
+        var posY = borderPadding + Math.round( (this.height - 2*borderPadding)*Kurve.Game.random() );
         
         return new Kurve.Point(posX, posY);
     },
