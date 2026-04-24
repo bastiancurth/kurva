@@ -54,6 +54,11 @@ Kurve.Config = {
         initialSuperpowerCount: 2,
     },
 
+    Online: {
+        fixedFieldWidth: 1280,
+        fixedFieldHeight: 720,
+    },
+
     Superpower: {
         maxSuperpowers: 6,
     },

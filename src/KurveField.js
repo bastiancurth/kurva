@@ -101,10 +101,23 @@ Kurve.Field = {
         document.body.style.height = window.innerHeight + 'px';
         document.body.style.width = window.innerWidth + 'px';
 
-        this.width = window.innerWidth * Kurve.Config.Field.width;
-        this.height = window.innerHeight;
+        var useFixedOnlineField =
+            Kurve.Game &&
+            Kurve.Game.onlineControls &&
+            Kurve.Game.onlineControls.enabled;
+
+        if (useFixedOnlineField) {
+            this.width = Kurve.Config.Online.fixedFieldWidth;
+            this.height = Kurve.Config.Online.fixedFieldHeight;
+        } else {
+            this.width = window.innerWidth * Kurve.Config.Field.width;
+            this.height = window.innerHeight;
+        }
+
         this.canvas.width = this.width;
         this.canvas.height = this.height;
+        this.canvas.style.width = this.width + 'px';
+        this.canvas.style.height = this.height + 'px';
 
         this.pixiApp.resize();
         this.drawField();

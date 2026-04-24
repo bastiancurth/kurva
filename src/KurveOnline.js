@@ -349,10 +349,9 @@ Kurve.Online = {
     },
 
     startOnlineGame: function(seed) {
+        Kurve.Game.resetSession();
         Kurve.Game.setDeterministicSeed(seed);
         this.prepareOnlinePlayers();
-
-        Kurve.Game.resetSession();
         Kurve.Game.setOnlineControls(this.localPlayerId);
 
         this.activePlayerIds.forEach(function(playerId) {
@@ -373,12 +372,24 @@ Kurve.Online = {
     },
 
     prepareOnlinePlayers: function() {
+        var availableTypes = Object.keys(Kurve.Superpowerconfig.types)
+            .map(function(key) { return Kurve.Superpowerconfig.types[key]; })
+            .filter(function(type) {
+                return type !== Kurve.Superpowerconfig.types.NO_SUPERPOWER &&
+                       type !== Kurve.Superpowerconfig.types.RANDOM;
+            });
+
         Kurve.players.forEach(function(player) {
             Kurve.Menu.deactivatePlayer(player.getId());
             player.setSuperpower(Kurve.Factory.getSuperpower(Kurve.Superpowerconfig.types.NO_SUPERPOWER));
         });
 
         this.activePlayerIds.forEach(function(playerId) {
+            var randomType = availableTypes[Math.floor(Kurve.Game.random() * availableTypes.length)];
+            if (randomType) {
+                Kurve.getPlayer(playerId).setSuperpower(Kurve.Factory.getSuperpower(randomType));
+            }
+
             Kurve.Menu.activatePlayer(playerId);
         });
     },
