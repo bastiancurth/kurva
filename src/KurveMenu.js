@@ -28,13 +28,43 @@ Kurve.Menu = {
     
     boundOnKeyDown: null,
     audioPlayer: null,
+    splashIntervalId: null,
     scrollKeys: ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Spacebar', ' '],
+    splashMessages: [
+        'Did you finish your to-do list yet?',
+        'Coffee check complete?',
+        'Productivity level: suspiciously high.',
+        'Just one match... probably.',
+        'Are we shipping today?',
+        'Still waiting on that one reply?',
+        'Team sync in 3, 2, 1...',
+        'Keyboard warmed up and ready.',
+        'No bugs were harmed in this round.',
+        'Play fair, brag responsibly.',
+    ],
     
     init: function() {
         this.initPlayerMenu();
+        this.initSplashMessage();
         this.addWindowListeners();
         this.addMouseListeners();
         this.initMenuMusic();
+    },
+
+    initSplashMessage: function() {
+        var splashElement = document.getElementById('menu-splash');
+        if (!splashElement) return;
+
+        this.applyRandomSplashMessage();
+        this.splashIntervalId = setInterval(this.applyRandomSplashMessage.bind(this), 5500);
+    },
+
+    applyRandomSplashMessage: function() {
+        var splashElement = document.getElementById('menu-splash');
+        if (!splashElement || this.splashMessages.length === 0) return;
+
+        var message = this.splashMessages[Math.floor(Math.random() * this.splashMessages.length)];
+        splashElement.textContent = message;
     },
         
     initPlayerMenu: function() {
@@ -70,6 +100,10 @@ Kurve.Menu = {
     },
 
     onPlayerItemClicked: function(event) {
+        if (Kurve.Online.shouldConsumeMenuKey(event)) {
+            return;
+        }
+
         Kurve.Menu.audioPlayer.play('menu-navigate');
         Kurve.Menu.togglePlayerActivation(this.id);
     },
@@ -77,6 +111,10 @@ Kurve.Menu = {
     onKeyDown: function(event) {
         if (event.metaKey) {
             return; //Command or Ctrl pressed
+        }
+
+        if (Kurve.Online.shouldConsumeMenuKey(event)) {
+            return;
         }
 
         if (Kurve.Menu.scrollKeys.indexOf(event.key) >= 0) {
@@ -102,6 +140,11 @@ Kurve.Menu = {
     },
     
     onSpaceDown: function() {
+        if (Kurve.Online.isRoomJoined()) {
+            Kurve.Online.setStatus('Use Start match in the online panel.');
+            return;
+        }
+
         Kurve.players.forEach(function(player) {
             if ( player.isActive() ) {
                 Kurve.Game.curves.push(

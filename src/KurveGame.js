@@ -42,6 +42,7 @@ Kurve.Game = {
     playerScoresElement:    null,
     isGameOver:             false,
     CURRENT_FRAME_ID:       0,
+    onlineControls:         null,
     
     init: function() {
         this.fps = Kurve.Config.Game.fps;
@@ -78,18 +79,96 @@ Kurve.Game = {
         }
 
         if ( event.keyCode === 32 ) {
+            if (this.onlineControls && this.onlineControls.enabled) {
+                if (this.onlineControls.localPlayerId !== null) {
+                    this.onSpaceDown();
+                    Kurve.Online.onLocalSpaceKey();
+                }
+
+                return;
+            }
+
             this.onSpaceDown();
         }
 
+        if (this.onlineControls && this.onlineControls.enabled && !this.isLocalInputKey(event.keyCode)) {
+            return;
+        }
+
         this.keysDown[event.keyCode] = true;
+
+        if (this.onlineControls && this.onlineControls.enabled) {
+            Kurve.Online.onLocalGameplayKey(event.keyCode, true);
+        }
     },
     
     onKeyUp: function(event) {
+        if (this.onlineControls && this.onlineControls.enabled && !this.isLocalInputKey(event.keyCode)) {
+            return;
+        }
+
         delete this.keysDown[event.keyCode];
+
+        if (this.onlineControls && this.onlineControls.enabled) {
+            Kurve.Online.onLocalGameplayKey(event.keyCode, false);
+        }
     },
     
     isKeyDown: function(keyCode) {
         return this.keysDown[keyCode] === true;
+    },
+
+    getPlayerById: function(playerId) {
+        return Kurve.getPlayer(playerId);
+    },
+
+    setOnlineControls: function(localPlayerId) {
+        this.onlineControls = {
+            enabled: true,
+            localPlayerId: localPlayerId,
+        };
+    },
+
+    isLocalInputKey: function(keyCode) {
+        if (!this.onlineControls || !this.onlineControls.enabled) return true;
+
+        var player = this.getPlayerById(this.onlineControls.localPlayerId);
+        if (!player) return false;
+
+        return player.getKeyLeft() === keyCode ||
+               player.getKeyRight() === keyCode ||
+               player.getKeySuperpower() === keyCode;
+    },
+
+    applyNetworkInput: function(playerId, action, isDown) {
+        var player = this.getPlayerById(playerId);
+        if (!player) return;
+
+        var keyCode = null;
+
+        if (action === 'left') keyCode = player.getKeyLeft();
+        if (action === 'right') keyCode = player.getKeyRight();
+        if (action === 'superpower') keyCode = player.getKeySuperpower();
+
+        if (keyCode === null) return;
+
+        if (isDown) {
+            this.keysDown[keyCode] = true;
+        } else {
+            delete this.keysDown[keyCode];
+        }
+    },
+
+    resetSession: function() {
+        this.keysDown = {};
+        this.curves = [];
+        this.runningCurves = {};
+        this.players = [];
+        this.deathMatch = false;
+        this.isPaused = false;
+        this.isRoundStarted = false;
+        this.isGameOver = false;
+        this.CURRENT_FRAME_ID = 0;
     },
     
     onSpaceDown: function() {

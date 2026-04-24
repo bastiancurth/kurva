@@ -13,6 +13,7 @@ var kurveSources = [
     './src/KurveFactory.js',
     './src/KurveConfig.js',
     './src/KurveUtility.js',
+    './src/KurveOnline.js',
     './src/KurveMenu.js',
     './src/KurveGame.js',
     './src/KurveField.js',

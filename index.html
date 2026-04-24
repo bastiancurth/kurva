@@ -17,7 +17,7 @@
         <meta property="og:description" content="An open source HTML5 and JavaScript implementation of the game Achtung, die Kurve!" />
         <meta property="og:locale" content="en_US" />
 
-        <title>Achtung, die Kurve!</title>
+        <title>Online Multiplayer by Bastian Curth</title>
                 
         <link rel='stylesheet' type='text/css' href='dist/css/main.css' />
         <link rel='icon' type='image/ico' href='dist/images/favicon.ico'>
@@ -30,7 +30,9 @@
                         <td>
                             <div id='menu'>
                                 <div id='menu-intro' class='light'>
+                                    <h2 id='menu-brand-title'>Online Multiplayer by Bastian Curth</h2>
                                     <h4>Choose players using your mouse or the keyboard and hit <strong>SPACE</strong> to start the game!</h4>
+                                    <p id='menu-splash' class='menu-splash'>Ready for one more round?</p>
                                 </div>
 
                                 <div id='menu-players'>
@@ -168,6 +170,7 @@
             </div>
         </div>
 
+        <script type='text/javascript' src='/socket.io/socket.io.js'></script>
         <script type='text/javascript' src='dist/js/kurve.min.js'></script>
     </body>
 </html>
