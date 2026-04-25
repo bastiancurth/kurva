@@ -591,6 +591,7 @@ io.on('connection', function(socket) {
 
         var controlPayload = {
             action: payload.action,
+            data: payload.data,
         };
 
         if (payload.action === 'next-round') {
@@ -602,6 +603,7 @@ io.on('connection', function(socket) {
         io.to(roomCode).emit('kurve:control', {
             action: controlPayload.action,
             roundStart: controlPayload.roundStart,
+            data: controlPayload.data,
         });
     });
 

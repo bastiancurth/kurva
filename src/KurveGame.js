@@ -59,6 +59,11 @@ Kurve.Game = {
     },
     
     run: function() {
+        if (this.onlineControls && this.onlineControls.enabled) {
+            this.drawFrame();
+            return;
+        }
+
         requestAnimationFrame(this.drawFrame.bind(this));
     },
     
@@ -219,6 +224,33 @@ Kurve.Game = {
 
     setOnlineRoundStart: function(roundStartByPlayer) {
         this.onlineRoundStartByPlayer = roundStartByPlayer || null;
+    },
+
+    exportScoreSnapshot: function() {
+        var snapshot = {};
+
+        this.players.forEach(function(player) {
+            snapshot[player.getId()] = {
+                points: player.getPoints(),
+                superpowerCount: player.getSuperpower().getCount(),
+            };
+        });
+
+        return snapshot;
+    },
+
+    applyScoreSnapshot: function(snapshot) {
+        if (!snapshot) return;
+
+        this.players.forEach(function(player) {
+            var playerSnapshot = snapshot[player.getId()];
+            if (!playerSnapshot) return;
+
+            player.setPoints(playerSnapshot.points);
+            player.getSuperpower().setCount(playerSnapshot.superpowerCount);
+        });
+
+        this.renderPlayerScores();
     },
 
     advanceOnlineRound: function() {
@@ -400,6 +432,10 @@ Kurve.Game = {
         this.Audio.terminateRound();
         Kurve.Field.resize();
         this.checkForWinner();
+
+        if (this.onlineControls && this.onlineControls.enabled && Kurve.Online.isHost()) {
+            Kurve.Online.sendRoundSync(this.exportScoreSnapshot());
+        }
 
         if (this.onlineControls && this.onlineControls.enabled && this.pendingOnlineRoundAdvance && !this.isGameOver && !this.deathMatch) {
             this.pendingOnlineRoundAdvance = false;

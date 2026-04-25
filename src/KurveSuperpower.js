@@ -50,6 +50,10 @@ Kurve.Superpower = function(hooks, act, helpers, type, init, close, audioPlayer)
         Kurve.Game.renderPlayerScores();
     };
 
+    this.setCount = function(newCount) {
+        count = Math.max(0, Math.min(Kurve.Config.Superpower.maxSuperpowers, parseInt(newCount, 10) || 0));
+    };
+
     this.getAudioPlayer = function() { return audioPlayer; };
     this.getHooks = function() { return hooks; };
     this.getType = function() { return type; };

@@ -452,6 +452,11 @@ Kurve.Online = {
             return;
         }
 
+        if (payload.action === 'round-sync') {
+            Kurve.Game.applyScoreSnapshot(payload.data ? payload.data.scoreSnapshot : null);
+            return;
+        }
+
         if (payload.action === 'pause') {
             if (Kurve.Game.isRunning && !Kurve.Game.isPaused) Kurve.Game.togglePause();
             return;
@@ -480,6 +485,18 @@ Kurve.Online = {
         this.socket.emit('kurve:control', {
             roomCode: this.roomCode,
             action: 'next-round',
+        });
+    },
+
+    sendRoundSync: function(scoreSnapshot) {
+        if (!this.isMatchActive || !this.isHost() || this.socket === null || !this.isRoomJoined()) return;
+
+        this.socket.emit('kurve:control', {
+            roomCode: this.roomCode,
+            action: 'round-sync',
+            data: {
+                scoreSnapshot: scoreSnapshot,
+            },
         });
     },
 

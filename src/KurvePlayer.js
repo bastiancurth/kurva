@@ -36,6 +36,10 @@ Kurve.Player = function(id, keyLeft, keyRight, keySuperpower) {
         points++;
     };
 
+    this.setPoints = function(newPoints) {
+        points = Math.max(0, parseInt(newPoints, 10) || 0);
+    };
+
     this.setSuperpower = function(newSuperpower) {
         superpower = newSuperpower;
 
