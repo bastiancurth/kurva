@@ -243,6 +243,8 @@ body#app.online-mode #dark-knight {
     padding: 28px;
     width: 620px;
     max-width: calc(100vw - 56px);
+    background: var(--ui-surface);
+    border: 1px solid var(--ui-border);
     border-radius: 28px;
     box-shadow: 0 28px 70px rgba(31, 41, 55, 0.14);
     position: relative;
