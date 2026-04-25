@@ -39,6 +39,7 @@ Kurve.Online = {
     assignedSuperpowers: {},
     localName: 'Player',
     isMatchActive: false,
+    awaitingStateSync: false,
     socketIoClientLoading: false,
 
     sessionStorageKey: 'kurve-online-session-id',
@@ -231,6 +232,7 @@ Kurve.Online = {
         this.localPlayerId = null;
         this.activePlayerIds = [];
         this.isMatchActive = false;
+        this.awaitingStateSync = false;
         this.syncButtons();
         this.setStatus('Room left.');
     },
@@ -275,9 +277,14 @@ Kurve.Online = {
         this.roomName = payload.roomName || null;
         this.players = payload.players;
         this.hostSocketId = payload.hostSocketId;
+        this.isMatchActive = payload.matchActive === true;
 
         this.updatePlayerAssignment();
         this.syncButtons();
+
+        if (this.isMatchActive && this.localPlayerId !== null && !this.isHost() && !this.awaitingStateSync) {
+            this.requestStateSync();
+        }
 
         var hostSuffix = this.isHost() ? ' You are host.' : '';
         var roomLabel = this.roomName || this.roomCode;
@@ -333,8 +340,10 @@ Kurve.Online = {
 
     onMatchStart: function(payload) {
         this.isMatchActive = true;
+        this.awaitingStateSync = false;
         this.activePlayerIds = [];
         this.assignedSuperpowers = payload.superpowers || {};
+        this.hostSocketId = this.localSocketId;
 
         this.localPlayerId = payload.assignments[this.sessionId] || null;
 
@@ -425,6 +434,7 @@ Kurve.Online = {
             roomCode: this.roomCode,
             action: action,
             isDown: isDown,
+            frameId: Kurve.Game.CURRENT_FRAME_ID,
             applyFrame: applyFrame,
         });
     },
@@ -436,10 +446,15 @@ Kurve.Online = {
     onRemoteInput: function(payload) {
         if (!this.isMatchActive) return;
 
-        Kurve.Game.queueNetworkInput(payload.playerId, payload.action, payload.isDown, payload.applyFrame);
+        Kurve.Game.queueNetworkInput(payload.playerId, payload.action, payload.isDown, payload.applyFrame, payload.frameId);
     },
 
     onRemoteControl: function(payload) {
+        if (payload.action === 'state-sync') {
+            this.onStateSync(payload.data || null);
+            return;
+        }
+
         if (!this.isMatchActive) return;
         if (payload.action === 'space') {
             Kurve.Game.onSpaceDown();
@@ -464,6 +479,14 @@ Kurve.Online = {
 
         if (payload.action === 'resume') {
             if (Kurve.Game.isPaused) Kurve.Game.togglePause();
+            return;
+        }
+
+        if (payload.action === 'request-state-sync') {
+            if (this.isHost() && payload.data && payload.data.requesterSocketId) {
+                this.sendStateSync(payload.data.requesterSocketId);
+            }
+            return;
         }
     },
 
@@ -486,6 +509,57 @@ Kurve.Online = {
             roomCode: this.roomCode,
             action: 'next-round',
         });
+    },
+
+    requestStateSync: function() {
+        if (!this.isMatchActive || this.socket === null || !this.isRoomJoined()) return;
+
+        this.awaitingStateSync = true;
+        this.socket.emit('kurve:control', {
+            roomCode: this.roomCode,
+            action: 'request-state-sync',
+            data: {
+                requesterSocketId: this.localSocketId,
+                requesterSessionId: this.sessionId,
+            },
+        });
+    },
+
+    sendStateSync: function(targetSocketId) {
+        if (!this.isHost() || this.socket === null || !this.isRoomJoined()) return;
+
+        this.socket.emit('kurve:control', {
+            roomCode: this.roomCode,
+            action: 'state-sync',
+            data: {
+                targetSocketId: targetSocketId,
+                state: Kurve.Game.exportState(),
+            },
+        });
+    },
+
+    onStateSync: function(payload) {
+        if (!payload || !payload.state) return;
+
+        this.awaitingStateSync = false;
+        this.isMatchActive = true;
+        this.activePlayerIds = [];
+
+        this.restoreOnlineGame(payload.state);
+    },
+
+    restoreOnlineGame: function(state) {
+        if (!state) return;
+
+        Kurve.Game.setOnlineControls(this.localPlayerId);
+        Kurve.Game.applyState(state);
+
+        u.addClass('online-mode', 'app');
+        u.addClass('hidden', 'layer-menu');
+        u.removeClass('hidden', 'layer-game');
+
+        Kurve.Menu.audioPlayer.pause('menu-music', {fade: 1000});
+        this.setStatus('Match restored. You are ' + this.localPlayerId + '.');
     },
 
     sendRoundSync: function(scoreSnapshot) {

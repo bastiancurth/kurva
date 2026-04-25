@@ -36,6 +36,7 @@ Kurve.Field = {
     
     drawnPixels: {},
     drawnPowerUps: {},
+    drawnSegments: [],
     defaultLineWidth: null,
     drawnPixelPrecision: null,
     
@@ -134,6 +135,7 @@ Kurve.Field = {
     clearFieldContent: function() {
         this.drawnPixels = {};
         this.drawnPowerUps = {};
+        this.drawnSegments = [];
 
         this.pixiCurves.clear();
         this.pixiDebug.clear();
@@ -147,8 +149,20 @@ Kurve.Field = {
         this.pixiField.drawRect(0, 0, this.width, this.height);
     },
 
-    drawLine: function(type, fromPointX, fromPointY, toPointX, toPointY, color, curve) {
+    drawLine: function(type, fromPointX, fromPointY, toPointX, toPointY, color, curve, shouldRecord) {
         if ( color === undefined ) color = Kurve.Theming.getThemedValue('field', 'defaultColor');
+
+        if (shouldRecord !== false) {
+            this.drawnSegments.push({
+                type: type,
+                fromPointX: fromPointX,
+                fromPointY: fromPointY,
+                toPointX: toPointX,
+                toPointY: toPointY,
+                color: color,
+                playerId: curve && curve.getPlayer ? curve.getPlayer().getId() : null,
+            });
+        }
 
         if (type === 'curve') {
             this.pixiCurves.lineStyle(this.defaultLineWidth, u.stringToHex(color));
@@ -214,6 +228,24 @@ Kurve.Field = {
             for( var pointY in interpolatedPoints[pointX]) {
                 this.addPointToDrawnPixel(type, pointX, pointY, color, curve);
             }
+        }
+    },
+
+    exportState: function() {
+        return {
+            drawnSegments: this.drawnSegments.slice(0),
+        };
+    },
+
+    applyState: function(state) {
+        if (!state || !state.drawnSegments) return;
+
+        this.clearFieldContent();
+        this.drawnSegments = state.drawnSegments.slice(0);
+
+        for (var i = 0; i < this.drawnSegments.length; i++) {
+            var segment = this.drawnSegments[i];
+            this.drawLine(segment.type, segment.fromPointX, segment.fromPointY, segment.toPointX, segment.toPointY, segment.color, null, false);
         }
     },
     

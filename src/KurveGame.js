@@ -49,6 +49,7 @@ Kurve.Game = {
     deterministicRandomState: null,
     onlineRoundStartByPlayer: null,
     pendingOnlineRoundAdvance: false,
+    windowListenersAdded: false,
     
     init: function() {
         this.fps = Kurve.Config.Game.fps;
@@ -71,18 +72,38 @@ Kurve.Game = {
         this.CURRENT_FRAME_ID++;
         this.processOnlineInputQueue(this.CURRENT_FRAME_ID);
 
-        for (var i in this.runningCurves) {
-            for (var j = 0; this.runningCurves[i] && j < this.runningCurves[i].length; ++j) {
-                this.runningCurves[i][j].drawNextFrame();
+        var runningPlayerIds = this.getDeterministicRunningPlayerIds();
+
+        for (var i = 0; i < runningPlayerIds.length; i++) {
+            var playerId = runningPlayerIds[i];
+            for (var j = 0; this.runningCurves[playerId] && j < this.runningCurves[playerId].length; ++j) {
+                this.runningCurves[playerId][j].drawNextFrame();
             }
         }
     },
+
+    getDeterministicRunningPlayerIds: function() {
+        var ids = [];
+
+        for (var i = 0; i < this.curves.length; i++) {
+            var playerId = this.curves[i].getPlayer().getId();
+            if (!this.runningCurves[playerId]) continue;
+            if (ids.indexOf(playerId) >= 0) continue;
+
+            ids.push(playerId);
+        }
+
+        return ids;
+    },
     
     addWindowListeners: function() {
+        if (this.windowListenersAdded) return;
+
         Kurve.Menu.removeWindowListeners();
         
         window.addEventListener('keydown', this.onKeyDown.bind(this));
         window.addEventListener('keyup', this.onKeyUp.bind(this));  
+        this.windowListenersAdded = true;
     },
     
     onKeyDown: function(event) {
@@ -167,8 +188,16 @@ Kurve.Game = {
         }
     },
 
-    queueNetworkInput: function(playerId, action, isDown, applyFrame) {
+    queueNetworkInput: function(playerId, action, isDown, applyFrame, senderFrameId) {
         var targetFrame = parseInt(applyFrame, 10);
+        var sourceFrame = parseInt(senderFrameId, 10);
+
+        if (!isNaN(targetFrame) && !isNaN(sourceFrame)) {
+            var leadFrames = targetFrame - sourceFrame;
+            if (leadFrames < 1) leadFrames = 1;
+            targetFrame = this.CURRENT_FRAME_ID + leadFrames;
+        }
+
         if (isNaN(targetFrame)) targetFrame = this.CURRENT_FRAME_ID + this.onlineInputDelayFrames;
         if (targetFrame <= this.CURRENT_FRAME_ID) targetFrame = this.CURRENT_FRAME_ID + 1;
 
@@ -209,6 +238,109 @@ Kurve.Game = {
         this.deterministicRandomState = null;
         this.onlineRoundStartByPlayer = null;
         this.pendingOnlineRoundAdvance = false;
+    },
+
+    exportState: function() {
+        var runningPlayerIds = this.getDeterministicRunningPlayerIds();
+
+        return {
+            deterministicRandomState: this.deterministicRandomState,
+            currentFrameId: this.CURRENT_FRAME_ID,
+            isRunning: this.isRunning,
+            isPaused: this.isPaused,
+            isRoundStarted: this.isRoundStarted,
+            deathMatch: this.deathMatch,
+            isGameOver: this.isGameOver,
+            maxPoints: this.maxPoints,
+            runningPlayerIds: runningPlayerIds,
+            players: this.players.map(function(player) {
+                return {
+                    id: player.getId(),
+                    points: player.getPoints(),
+                    superpowerType: player.getSuperpower().getType(),
+                    superpowerCount: player.getSuperpower().getCount(),
+                    color: player.getColor(),
+                    active: player.isActive(),
+                };
+            }),
+            curves: this.curves.map(function(curve) {
+                return curve.exportState();
+            }),
+            field: Kurve.Field.exportState(),
+        };
+    },
+
+    applyState: function(state) {
+        if (!state) return;
+
+        this.stopRun();
+        this.resetSession();
+        this.deterministicRandomState = state.deterministicRandomState >>> 0;
+        this.CURRENT_FRAME_ID = state.currentFrameId || 0;
+        this.isRunning = state.isRunning === true;
+        this.isPaused = state.isPaused === true;
+        this.isRoundStarted = state.isRoundStarted === true;
+        this.deathMatch = state.deathMatch === true;
+        this.isGameOver = state.isGameOver === true;
+        this.maxPoints = state.maxPoints;
+
+        if (state.players) {
+            state.players.forEach(function(playerState) {
+                var player = Kurve.getPlayer(playerState.id);
+                if (!player) return;
+
+                player.setPoints(playerState.points);
+                player.setColor(playerState.color || null);
+                player.setSuperpower(Kurve.Factory.getSuperpower(playerState.superpowerType));
+                player.getSuperpower().setCount(playerState.superpowerCount);
+                player.setIsActive(playerState.active === true);
+            });
+        }
+
+        this.players = [];
+        if (state.players) {
+            for (var i = 0; i < state.players.length; i++) {
+                var restoredPlayer = Kurve.getPlayer(state.players[i].id);
+                if (restoredPlayer) {
+                    this.players.push(restoredPlayer);
+                }
+            }
+        }
+
+        this.curves = [];
+        this.runningCurves = {};
+
+        if (state.curves) {
+            for (var j = 0; j < state.curves.length; j++) {
+                var curveState = state.curves[j];
+                var curvePlayer = Kurve.getPlayer(curveState.playerId);
+
+                if (!curvePlayer) continue;
+
+                var curve = new Kurve.Curve(curvePlayer, this, Kurve.Field, Kurve.Config.Curve, Kurve.Sound.getAudioPlayer());
+                curve.applyState(curveState);
+                this.curves.push(curve);
+
+                if (state.runningPlayerIds && state.runningPlayerIds.indexOf(curveState.playerId) >= 0) {
+                    this.runningCurves[curveState.playerId] = [curve];
+                }
+            }
+        }
+
+        this.addWindowListeners();
+
+        if (Kurve.Field.pixiApp === null) {
+            Kurve.Field.init();
+        } else {
+            Kurve.Field.resize();
+        }
+
+        Kurve.Field.applyState(state.field || null);
+        this.renderPlayerScores();
+
+        if (this.isRunning && !this.isPaused) {
+            this.startRun();
+        }
     },
 
     setDeterministicSeed: function(seed) {
@@ -356,8 +488,10 @@ Kurve.Game = {
         if ( this.runningCurves[playerId].length === 0 ) {
             // Drop this player.
             delete this.runningCurves[curve.getPlayer().getId()];
-            for (var i in this.runningCurves) {
-                this.runningCurves[i][0].getPlayer().incrementPoints();
+
+            var runningPlayerIds = this.getDeterministicRunningPlayerIds();
+            for (var i = 0; i < runningPlayerIds.length; i++) {
+                this.runningCurves[runningPlayerIds[i]][0].getPlayer().incrementPoints();
             }
         
             this.renderPlayerScores();
@@ -421,7 +555,9 @@ Kurve.Game = {
         });
 
         if ( this.deathMatch ) {
-            var curve = this.runningCurves[Object.keys(this.runningCurves)[0]][0];
+            var survivingPlayerIds = this.getDeterministicRunningPlayerIds();
+            var curve = survivingPlayerIds.length > 0 ? this.runningCurves[survivingPlayerIds[0]][0] : null;
+            if (!curve) return;
             this.gameOver(curve.getPlayer());
         }
 

@@ -65,6 +65,7 @@ Kurve.Curve = function(player, game, field, config, audioPlayer) {
     this.decrementImmunity = function() { if ( immunityFor > 0 ) immunityFor -= 1; };
     this.decrementPowerUpTimeOut = function() { if ( powerUpTimeOutFor > 0 ) powerUpTimeOutFor -= 1; };
     this.setIsInvisible = function(newIsInvisible) { isInvisible = newIsInvisible; };
+    this.setHoleCountDown = function(newHoleCountDown) { options.holeCountDown = newHoleCountDown; };
 
     this.isImmuneTo = function(curve) { return immunityFor > 0 && (immunityTo === 'all' || immunityTo.includes(curve)); };
     this.isPowerUpTimeOut = function() { return powerUpTimeOutFor > 0; };
@@ -78,8 +79,40 @@ Kurve.Curve = function(player, game, field, config, audioPlayer) {
     this.getNextPositionX = function() { return nextPositionX; };
     this.getOptions = function() { return options; };
     this.isInvisible = function() { return isInvisible; };
+    this.getImmunityFor = function() { return immunityFor; };
+    this.getImmunityTo = function() { return immunityTo; };
+    this.getPowerUpTimeOut = function() { return powerUpTimeOutFor; };
 
     this.resetHoleCountDown(); //Randomize initial hole interval
+};
+
+Kurve.Curve.prototype.exportState = function() {
+    return {
+        playerId: this.getPlayer().getId(),
+        positionX: this.getPositionX(),
+        positionY: this.getPositionY(),
+        nextPositionX: this.getNextPositionX(),
+        nextPositionY: this.getNextPositionY(),
+        angle: this.getOptions().angle,
+        holeCountDown: this.getOptions().holeCountDown,
+        immunityFor: this.getImmunityFor(),
+        immunityTo: this.getImmunityTo(),
+        powerUpTimeOutFor: this.getPowerUpTimeOut(),
+        isInvisible: this.isInvisible(),
+    };
+};
+
+Kurve.Curve.prototype.applyState = function(state) {
+    if (!state) return;
+
+    this.setPosition(state.positionX, state.positionY);
+    this.setNextPositionX(state.nextPositionX);
+    this.setNextPositionY(state.nextPositionY);
+    this.setAngle(state.angle);
+    this.setHoleCountDown(state.holeCountDown);
+    this.setImmunity(state.immunityTo || [], state.immunityFor || 0);
+    this.setPowerUpTimeOut(state.powerUpTimeOutFor || 0);
+    this.setIsInvisible(state.isInvisible === true);
 };
 
 Kurve.Curve.prototype.drawNextFrame = function() {

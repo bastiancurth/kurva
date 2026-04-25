@@ -14,8 +14,8 @@ var MAX_PLAYERS = 5;
 var RECONNECT_GRACE_MS = 120000;
 var CLEANUP_INTERVAL_MS = 30000;
 var PLAYER_IDS = ['red', 'orange', 'green', 'blue', 'purple'];
-var ONLINE_FIELD_WIDTH = 1280;
-var ONLINE_FIELD_HEIGHT = 720;
+var ONLINE_FIELD_WIDTH = 1000;
+var ONLINE_FIELD_HEIGHT = 1000;
 var ONLINE_FIELD_BORDER_PADDING = 80;
 var ONLINE_MIN_SPAWN_DISTANCE = 130;
 var SUPERPOWER_TYPES = [
@@ -241,6 +241,7 @@ function getRoomState(room) {
         roomCode: room.code,
         roomName: room.name,
         hostSocketId: resolveHostSocketId(room),
+        matchActive: room.matchActive === true,
         players: room.players.map(function(player) {
             return {
                 socketId: player.socketId,
@@ -572,6 +573,7 @@ io.on('connection', function(socket) {
             playerId: playerId,
             action: payload.action,
             isDown: payload.isDown === true,
+            frameId: parseInt(payload.frameId, 10),
             applyFrame: parseInt(payload.applyFrame, 10),
         });
     });
@@ -586,8 +588,33 @@ io.on('connection', function(socket) {
         var sessionId = socketToSession[socket.id];
         if (!sessionId || !room.assignments[sessionId]) return;
         if (payload.action === 'next-round' && resolveHostSocketId(room) !== socket.id) return;
+        if (payload.action === 'state-sync' && resolveHostSocketId(room) !== socket.id) return;
 
         touchRoom(room);
+
+        if (payload.action === 'request-state-sync') {
+            io.to(roomCode).emit('kurve:control', {
+                action: 'request-state-sync',
+                data: {
+                    requesterSocketId: socket.id,
+                    requesterSessionId: sessionId,
+                },
+            });
+            return;
+        }
+
+        if (payload.action === 'state-sync') {
+            var targetSocketId = payload.data && payload.data.targetSocketId;
+            if (!targetSocketId) return;
+
+            io.to(targetSocketId).emit('kurve:control', {
+                action: 'state-sync',
+                data: {
+                    state: payload.data.state,
+                },
+            });
+            return;
+        }
 
         var controlPayload = {
             action: payload.action,
